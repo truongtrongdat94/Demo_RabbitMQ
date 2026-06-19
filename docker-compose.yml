@@ -1,0 +1,126 @@
+name: iot-data-pipeline
+
+services:
+  rabbitmq-definitions:
+    image: rabbitmq:4.3-management
+    restart: "no"
+    network_mode: none
+    environment:
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?RABBITMQ_VHOST is required}
+      RABBITMQ_ADMIN_USER: ${RABBITMQ_ADMIN_USER:?RABBITMQ_ADMIN_USER is required}
+      RABBITMQ_ADMIN_PASSWORD: ${RABBITMQ_ADMIN_PASSWORD:?RABBITMQ_ADMIN_PASSWORD is required}
+      RABBITMQ_PUBLISHER_USER: ${RABBITMQ_PUBLISHER_USER:?RABBITMQ_PUBLISHER_USER is required}
+      RABBITMQ_PUBLISHER_PASSWORD: ${RABBITMQ_PUBLISHER_PASSWORD:?RABBITMQ_PUBLISHER_PASSWORD is required}
+      RABBITMQ_CONSUMER_USER: ${RABBITMQ_CONSUMER_USER:?RABBITMQ_CONSUMER_USER is required}
+      RABBITMQ_CONSUMER_PASSWORD: ${RABBITMQ_CONSUMER_PASSWORD:?RABBITMQ_CONSUMER_PASSWORD is required}
+    volumes:
+      - ./infra/rabbitmq/definitions.template.json:/work/definitions.template.json:ro
+      - ./infra/rabbitmq/rabbitmq.conf.template:/work/rabbitmq.conf.template:ro
+      - ./infra/rabbitmq/scripts/render-definitions.sh:/work/render-definitions.sh:ro
+      - ./infra/rabbitmq/generated:/generated
+    entrypoint: ["/bin/sh", "/work/render-definitions.sh"]
+
+  rabbitmq:
+    image: rabbitmq:4.3-management
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:1883:1883"
+    environment:
+      RABBITMQ_CONFIG_FILE: /etc/rabbitmq/generated/rabbitmq
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - ./infra/rabbitmq/generated:/etc/rabbitmq/generated:ro
+    depends_on:
+      rabbitmq-definitions:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - iot-backend
+
+  mongodb:
+    image: mongo:7.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?MONGO_INITDB_ROOT_USERNAME is required}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?MONGO_INITDB_ROOT_PASSWORD is required}
+      MONGO_INITDB_DATABASE: ${MONGO_APP_DATABASE:?MONGO_APP_DATABASE is required}
+      MONGO_APP_DATABASE: ${MONGO_APP_DATABASE:?MONGO_APP_DATABASE is required}
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME:?MONGO_APP_USERNAME is required}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:?MONGO_APP_PASSWORD is required}
+    volumes:
+      - mongodb_data:/data/db
+      - ./infra/mongodb/initdb.d:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "-u", "${MONGO_INITDB_ROOT_USERNAME}", "-p", "${MONGO_INITDB_ROOT_PASSWORD}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - iot-backend
+
+  node-red:
+    image: nodered/node-red:4.0.9
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1880:1880"
+    environment:
+      TZ: Asia/Bangkok
+      NODE_RED_CREDENTIAL_SECRET: ${NODE_RED_CREDENTIAL_SECRET:?NODE_RED_CREDENTIAL_SECRET is required}
+      NODE_RED_MQTT_USERNAME: ${RABBITMQ_PUBLISHER_USER:?RABBITMQ_PUBLISHER_USER is required}
+      NODE_RED_MQTT_PASSWORD: ${RABBITMQ_PUBLISHER_PASSWORD:?RABBITMQ_PUBLISHER_PASSWORD is required}
+    volumes:
+      - node_red_data:/data
+      - ./simulators/node-red-publisher/flows.json:/opt/node-red-source/flows.json:ro
+      - ./simulators/node-red-publisher/settings.js:/opt/node-red-source/settings.js:ro
+      - ./simulators/node-red-publisher/scripts:/opt/node-red-source/scripts:ro
+    entrypoint: ["/bin/sh", "/opt/node-red-source/scripts/bootstrap-node-red.sh"]
+    command: []
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - iot-backend
+
+  consumer-service:
+    build:
+      context: ./apps/consumer-service
+    restart: unless-stopped
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__VirtualHost: ${RABBITMQ_VHOST:?RABBITMQ_VHOST is required}
+      RabbitMq__UserName: ${RABBITMQ_CONSUMER_USER:?RABBITMQ_CONSUMER_USER is required}
+      RabbitMq__Password: ${RABBITMQ_CONSUMER_PASSWORD:?RABBITMQ_CONSUMER_PASSWORD is required}
+      RabbitMq__Queues__0: telemetry.electricity.queue
+      RabbitMq__Queues__1: telemetry.steam.queue
+      RabbitMq__Queues__2: telemetry.gas.queue
+      RabbitMq__PrefetchCount: ${CONSUMER_RABBITMQ_PREFETCH:-8}
+      Mongo__ConnectionString: ${CONSUMER_MONGO_CONNECTION_STRING:?CONSUMER_MONGO_CONNECTION_STRING is required}
+      Mongo__DatabaseName: ${MONGO_APP_DATABASE:?MONGO_APP_DATABASE is required}
+      Mongo__CollectionName: telemetry_events
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - iot-backend
+
+networks:
+  iot-backend:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+  mongodb_data:
+  node_red_data:

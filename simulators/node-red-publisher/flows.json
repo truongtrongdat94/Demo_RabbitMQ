@@ -1,0 +1,361 @@
+[
+    {
+        "id": "f0c7e86d4b2e1001",
+        "type": "tab",
+        "label": "MQTT Pet Project",
+        "disabled": false,
+        "info": "Publish test telemetry to RabbitMQ MQTT plugin for the current mqttpetproject topology."
+    },
+    {
+        "id": "f0c7e86d4b2e1003",
+        "type": "mqtt out",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Publish To RabbitMQ MQTT",
+        "topic": "",
+        "qos": "1",
+        "retain": "false",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "f0c7e86d4b2e1002",
+        "x": 940,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "f0c7e86d4b2e1004",
+        "type": "debug",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Published Message",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 940,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "f0c7e86d4b2e1005",
+        "type": "comment",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Setup",
+        "info": "RabbitMQ MQTT plugin: rabbitmq:1883 inside Docker Compose\nThe backend routes MQTT topics through iot.telemetry.exchange.\nUse topics like factory/telemetry/electricity/valid, factory/telemetry/steam/valid, factory/telemetry/gas/valid.",
+        "x": 190,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "f0c7e86d4b2e1010",
+        "type": "inject",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Electricity Valid",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 170,
+        "y": 100,
+        "wires": [
+            [
+                "f0c7e86d4b2e1020"
+            ]
+        ]
+    },
+    {
+        "id": "f0c7e86d4b2e1020",
+        "type": "function",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Prepare Electricity Valid",
+        "func": "const ts = Math.floor(Date.now() / 1000);\nconst suffix = Date.now();\nmsg.topic = \"factory/telemetry/electricity/valid\";\nmsg.payload = JSON.stringify({\n    MessageId: `elec-valid-${suffix}`,\n    CorrelationId: `corr-elec-valid-${suffix}`,\n    Source: \"NodeRed\",\n    SchemaVersion: \"1.0\",\n    MessageType: \"telemetry\",\n    ID_Gateway: \"GatewayFactory04\",\n    Timestamp_Gateway: ts,\n    Data_Gateway: [\n        {\n            Topic: \"Electricity\",\n            Data_Devices: [\n                {\n                    ID_Device: \"PM02MSB\",\n                    Type_Device: \"PM2130\",\n                    Timestamp_Device: ts,\n                    Reading_Device: {\n                        CurrentA: 1000.5,\n                        VoltageAN: 220.1,\n                        Frequency: 50.0\n                    }\n                }\n            ]\n        }\n    ],\n    Meta: {\n        IsTest: true,\n        TestCase: \"VALID_SAVE_DB\"\n    },\n    Simulate: {\n        NoSave: false,\n        ForceDbError: false\n    }\n});\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 480,
+        "y": 100,
+        "wires": [
+            [
+                "f0c7e86d4b2e1003",
+                "f0c7e86d4b2e1004"
+            ]
+        ]
+    },
+    {
+        "id": "f0c7e86d4b2e1011",
+        "type": "inject",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Electricity Invalid",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 190,
+        "y": 160,
+        "wires": [
+            [
+                "f0c7e86d4b2e1021"
+            ]
+        ]
+    },
+    {
+        "id": "f0c7e86d4b2e1021",
+        "type": "function",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Prepare Electricity Invalid",
+        "func": "const ts = Math.floor(Date.now() / 1000);\nconst suffix = Date.now();\nmsg.topic = \"factory/telemetry/electricity/invalid\";\nmsg.payload = JSON.stringify({\n    MessageId: `elec-invalid-${suffix}`,\n    CorrelationId: `corr-elec-invalid-${suffix}`,\n    Source: \"NodeRed\",\n    SchemaVersion: \"1.0\",\n    MessageType: \"telemetry\",\n    ID_Gateway: \"\",\n    Timestamp_Gateway: ts,\n    Data_Gateway: [\n        {\n            Topic: \"Electricity\",\n            Data_Devices: [\n                {\n                    ID_Device: \"PM02MSB\",\n                    Type_Device: \"PM2130\",\n                    Timestamp_Device: ts,\n                    Reading_Device: {\n                        CurrentA: 1000.5,\n                        VoltageAN: 220.1,\n                        Frequency: 50.0\n                    }\n                }\n            ]\n        }\n    ],\n    Meta: {\n        IsTest: true,\n        TestCase: \"INVALID_SCHEMA\"\n    },\n    Simulate: {\n        NoSave: false,\n        ForceDbError: false\n    }\n});\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 490,
+        "y": 160,
+        "wires": [
+            [
+                "f0c7e86d4b2e1003",
+                "f0c7e86d4b2e1004"
+            ]
+        ]
+    },
+    {
+        "id": "f0c7e86d4b2e1012",
+        "type": "inject",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Electricity No Save",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 190,
+        "y": 220,
+        "wires": [
+            [
+                "f0c7e86d4b2e1022"
+            ]
+        ]
+    },
+    {
+        "id": "f0c7e86d4b2e1022",
+        "type": "function",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Prepare Electricity No Save",
+        "func": "const ts = Math.floor(Date.now() / 1000);\nconst suffix = Date.now();\nmsg.topic = \"factory/telemetry/electricity/no-save\";\nmsg.payload = JSON.stringify({\n    MessageId: `elec-nosave-${suffix}`,\n    CorrelationId: `corr-elec-nosave-${suffix}`,\n    Source: \"NodeRed\",\n    SchemaVersion: \"1.0\",\n    MessageType: \"telemetry\",\n    ID_Gateway: \"GatewayFactory04\",\n    Timestamp_Gateway: ts,\n    Data_Gateway: [\n        {\n            Topic: \"Electricity\",\n            Data_Devices: [\n                {\n                    ID_Device: \"PM02MSB\",\n                    Type_Device: \"PM2130\",\n                    Timestamp_Device: ts,\n                    Reading_Device: {\n                        CurrentA: 1000.5,\n                        VoltageAN: 220.1,\n                        Frequency: 50.0\n                    }\n                }\n            ]\n        }\n    ],\n    Meta: {\n        IsTest: true,\n        TestCase: \"VALID_NO_SAVE\"\n    },\n    Simulate: {\n        NoSave: true,\n        ForceDbError: false\n    }\n});\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 500,
+        "y": 220,
+        "wires": [
+            [
+                "f0c7e86d4b2e1003",
+                "f0c7e86d4b2e1004"
+            ]
+        ]
+    },
+    {
+        "id": "f0c7e86d4b2e1013",
+        "type": "inject",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Electricity DB Error",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 200,
+        "y": 280,
+        "wires": [
+            [
+                "f0c7e86d4b2e1023"
+            ]
+        ]
+    },
+    {
+        "id": "f0c7e86d4b2e1023",
+        "type": "function",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Prepare Electricity DB Error",
+        "func": "const ts = Math.floor(Date.now() / 1000);\nconst suffix = Date.now();\nmsg.topic = \"factory/telemetry/electricity/db-error\";\nmsg.payload = JSON.stringify({\n    MessageId: `elec-dberror-${suffix}`,\n    CorrelationId: `corr-elec-dberror-${suffix}`,\n    Source: \"NodeRed\",\n    SchemaVersion: \"1.0\",\n    MessageType: \"telemetry\",\n    ID_Gateway: \"GatewayFactory04\",\n    Timestamp_Gateway: ts,\n    Data_Gateway: [\n        {\n            Topic: \"Electricity\",\n            Data_Devices: [\n                {\n                    ID_Device: \"PM02MSB\",\n                    Type_Device: \"PM2130\",\n                    Timestamp_Device: ts,\n                    Reading_Device: {\n                        CurrentA: 1000.5,\n                        VoltageAN: 220.1,\n                        Frequency: 50.0\n                    }\n                }\n            ]\n        }\n    ],\n    Meta: {\n        IsTest: true,\n        TestCase: \"VALID_FORCE_DB_ERROR\"\n    },\n    Simulate: {\n        NoSave: false,\n        ForceDbError: true\n    }\n});\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 500,
+        "y": 280,
+        "wires": [
+            [
+                "f0c7e86d4b2e1003",
+                "f0c7e86d4b2e1004"
+            ]
+        ]
+    },
+    {
+        "id": "f0c7e86d4b2e1014",
+        "type": "inject",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Steam Valid",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 360,
+        "wires": [
+            [
+                "f0c7e86d4b2e1024"
+            ]
+        ]
+    },
+    {
+        "id": "f0c7e86d4b2e1024",
+        "type": "function",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Prepare Steam Valid",
+        "func": "const ts = Math.floor(Date.now() / 1000);\nconst suffix = Date.now();\nmsg.topic = \"factory/telemetry/steam/valid\";\nmsg.payload = JSON.stringify({\n    MessageId: `steam-valid-${suffix}`,\n    CorrelationId: `corr-steam-valid-${suffix}`,\n    Source: \"NodeRed\",\n    SchemaVersion: \"1.0\",\n    MessageType: \"telemetry\",\n    ID_Gateway: \"GatewayFactory04\",\n    Timestamp_Gateway: ts,\n    Data_Gateway: [\n        {\n            Topic: \"Steam\",\n            Data_Devices: [\n                {\n                    ID_Device: \"Steam01\",\n                    Type_Device: \"SteamSensor\",\n                    Timestamp_Device: ts,\n                    Reading_Device: {\n                        FlowRate: 10.5,\n                        Temperature: 90.0,\n                        Pressure: 2.0\n                    }\n                }\n            ]\n        }\n    ],\n    Meta: {\n        IsTest: true,\n        TestCase: \"STEAM_VALID\"\n    },\n    Simulate: {\n        NoSave: false,\n        ForceDbError: false\n    }\n});\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 470,
+        "y": 360,
+        "wires": [
+            [
+                "f0c7e86d4b2e1003",
+                "f0c7e86d4b2e1004"
+            ]
+        ]
+    },
+    {
+        "id": "f0c7e86d4b2e1015",
+        "type": "inject",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Gas Valid",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 420,
+        "wires": [
+            [
+                "f0c7e86d4b2e1025"
+            ]
+        ]
+    },
+    {
+        "id": "f0c7e86d4b2e1025",
+        "type": "function",
+        "z": "f0c7e86d4b2e1001",
+        "name": "Prepare Gas Valid",
+        "func": "const ts = Math.floor(Date.now() / 1000);\nconst suffix = Date.now();\nmsg.topic = \"factory/telemetry/gas/valid\";\nmsg.payload = JSON.stringify({\n    MessageId: `gas-valid-${suffix}`,\n    CorrelationId: `corr-gas-valid-${suffix}`,\n    Source: \"NodeRed\",\n    SchemaVersion: \"1.0\",\n    MessageType: \"telemetry\",\n    ID_Gateway: \"GatewayFactory04\",\n    Timestamp_Gateway: ts,\n    Data_Gateway: [\n        {\n            Topic: \"Gas\",\n            Data_Devices: [\n                {\n                    ID_Device: \"Gas01\",\n                    Type_Device: \"GasSensor\",\n                    Timestamp_Device: ts,\n                    Reading_Device: {\n                        FlowRate: 5.5,\n                        Temperature: 30.0,\n                        Pressure: 1.5\n                    }\n                }\n            ]\n        }\n    ],\n    Meta: {\n        IsTest: true,\n        TestCase: \"GAS_VALID\"\n    },\n    Simulate: {\n        NoSave: false,\n        ForceDbError: false\n    }\n});\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 460,
+        "y": 420,
+        "wires": [
+            [
+                "f0c7e86d4b2e1003",
+                "f0c7e86d4b2e1004"
+            ]
+        ]
+    },
+    {
+        "id": "f0c7e86d4b2e1002",
+        "type": "mqtt-broker",
+        "name": "RabbitMQ MQTT Docker",
+        "broker": "rabbitmq",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    }
+]

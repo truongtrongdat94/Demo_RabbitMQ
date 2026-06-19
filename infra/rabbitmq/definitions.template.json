@@ -1,0 +1,211 @@
+{
+  "vhosts": [
+    {
+      "name": "__RABBITMQ_VHOST__"
+    }
+  ],
+  "users": [
+    {
+      "name": "__RABBITMQ_ADMIN_USER__",
+      "password_hash": "__RABBITMQ_ADMIN_PASSWORD_HASH__",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": [
+        "administrator"
+      ],
+      "limits": {}
+    },
+    {
+      "name": "__RABBITMQ_PUBLISHER_USER__",
+      "password_hash": "__RABBITMQ_PUBLISHER_PASSWORD_HASH__",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": [],
+      "limits": {}
+    },
+    {
+      "name": "__RABBITMQ_CONSUMER_USER__",
+      "password_hash": "__RABBITMQ_CONSUMER_PASSWORD_HASH__",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": [],
+      "limits": {}
+    }
+  ],
+  "permissions": [
+    {
+      "user": "__RABBITMQ_ADMIN_USER__",
+      "vhost": "__RABBITMQ_VHOST__",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "__RABBITMQ_PUBLISHER_USER__",
+      "vhost": "__RABBITMQ_VHOST__",
+      "configure": "^$",
+      "write": "^iot\\.telemetry\\.exchange$",
+      "read": "^$"
+    },
+    {
+      "user": "__RABBITMQ_CONSUMER_USER__",
+      "vhost": "__RABBITMQ_VHOST__",
+      "configure": "^$",
+      "write": "^$",
+      "read": "^telemetry\\.(electricity|steam|gas)\\.queue$"
+    }
+  ],
+  "topic_permissions": [
+    {
+      "user": "__RABBITMQ_PUBLISHER_USER__",
+      "vhost": "__RABBITMQ_VHOST__",
+      "exchange": "iot.telemetry.exchange",
+      "write": "^factory\\.telemetry\\.(electricity|steam|gas)\\..*$",
+      "read": "^$"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "iot.telemetry.exchange",
+      "vhost": "__RABBITMQ_VHOST__",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "iot.telemetry.dlx",
+      "vhost": "__RABBITMQ_VHOST__",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "telemetry.electricity.queue",
+      "vhost": "__RABBITMQ_VHOST__",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-delivery-limit": 5,
+        "x-delayed-retry-type": "all",
+        "x-delayed-retry-min": 1000,
+        "x-delayed-retry-max": 30000,
+        "x-dead-letter-exchange": "iot.telemetry.dlx",
+        "x-dead-letter-routing-key": "telemetry.electricity.dead"
+      }
+    },
+    {
+      "name": "telemetry.steam.queue",
+      "vhost": "__RABBITMQ_VHOST__",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-delivery-limit": 5,
+        "x-delayed-retry-type": "all",
+        "x-delayed-retry-min": 1000,
+        "x-delayed-retry-max": 30000,
+        "x-dead-letter-exchange": "iot.telemetry.dlx",
+        "x-dead-letter-routing-key": "telemetry.steam.dead"
+      }
+    },
+    {
+      "name": "telemetry.gas.queue",
+      "vhost": "__RABBITMQ_VHOST__",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-delivery-limit": 5,
+        "x-delayed-retry-type": "all",
+        "x-delayed-retry-min": 1000,
+        "x-delayed-retry-max": 30000,
+        "x-dead-letter-exchange": "iot.telemetry.dlx",
+        "x-dead-letter-routing-key": "telemetry.gas.dead"
+      }
+    },
+    {
+      "name": "telemetry.electricity.dlq",
+      "vhost": "__RABBITMQ_VHOST__",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "telemetry.steam.dlq",
+      "vhost": "__RABBITMQ_VHOST__",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "telemetry.gas.dlq",
+      "vhost": "__RABBITMQ_VHOST__",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "iot.telemetry.exchange",
+      "vhost": "__RABBITMQ_VHOST__",
+      "destination": "telemetry.electricity.queue",
+      "destination_type": "queue",
+      "routing_key": "factory.telemetry.electricity.#",
+      "arguments": {}
+    },
+    {
+      "source": "iot.telemetry.exchange",
+      "vhost": "__RABBITMQ_VHOST__",
+      "destination": "telemetry.steam.queue",
+      "destination_type": "queue",
+      "routing_key": "factory.telemetry.steam.#",
+      "arguments": {}
+    },
+    {
+      "source": "iot.telemetry.exchange",
+      "vhost": "__RABBITMQ_VHOST__",
+      "destination": "telemetry.gas.queue",
+      "destination_type": "queue",
+      "routing_key": "factory.telemetry.gas.#",
+      "arguments": {}
+    },
+    {
+      "source": "iot.telemetry.dlx",
+      "vhost": "__RABBITMQ_VHOST__",
+      "destination": "telemetry.electricity.dlq",
+      "destination_type": "queue",
+      "routing_key": "telemetry.electricity.dead",
+      "arguments": {}
+    },
+    {
+      "source": "iot.telemetry.dlx",
+      "vhost": "__RABBITMQ_VHOST__",
+      "destination": "telemetry.steam.dlq",
+      "destination_type": "queue",
+      "routing_key": "telemetry.steam.dead",
+      "arguments": {}
+    },
+    {
+      "source": "iot.telemetry.dlx",
+      "vhost": "__RABBITMQ_VHOST__",
+      "destination": "telemetry.gas.dlq",
+      "destination_type": "queue",
+      "routing_key": "telemetry.gas.dead",
+      "arguments": {}
+    }
+  ],
+  "policies": [],
+  "parameters": [],
+  "global_parameters": []
+}
