@@ -1,5 +1,23 @@
 name: iot-data-pipeline
 
+x-rabbitmq-common: &rabbitmq-common
+  image: rabbitmq:4.3-management
+  restart: unless-stopped
+  environment: &rabbitmq-common-env
+    RABBITMQ_CONFIG_FILE: /etc/rabbitmq/generated/rabbitmq
+    RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:?RABBITMQ_ERLANG_COOKIE is required}
+    RABBITMQ_DEFAULT_USER: ${RABBITMQ_ADMIN_USER:?RABBITMQ_ADMIN_USER is required}
+    RABBITMQ_DEFAULT_PASS: ${RABBITMQ_ADMIN_PASSWORD:?RABBITMQ_ADMIN_PASSWORD is required}
+    RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:?RABBITMQ_VHOST is required}
+  depends_on:
+    rabbitmq-definitions:
+      condition: service_completed_successfully
+  healthcheck:
+    test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
+
 services:
   rabbitmq-definitions:
     image: rabbitmq:4.3-management
@@ -20,27 +38,78 @@ services:
       - ./infra/rabbitmq/generated:/generated
     entrypoint: ["/bin/sh", "/work/render-definitions.sh"]
 
-  rabbitmq:
-    image: rabbitmq:4.3-management
-    restart: unless-stopped
+  rabbitmq-1:
+    <<: *rabbitmq-common
+    hostname: rabbitmq-1
     ports:
       - "127.0.0.1:5672:5672"
       - "127.0.0.1:15672:15672"
       - "127.0.0.1:1883:1883"
     environment:
-      RABBITMQ_CONFIG_FILE: /etc/rabbitmq/generated/rabbitmq
+      <<: *rabbitmq-common-env
+      RABBITMQ_NODENAME: rabbit@rabbitmq-1
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_1_data:/var/lib/rabbitmq
       - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
       - ./infra/rabbitmq/generated:/etc/rabbitmq/generated:ro
+    networks:
+      iot-backend:
+        aliases:
+          - rabbitmq
+
+  rabbitmq-2:
+    <<: *rabbitmq-common
+    hostname: rabbitmq-2
+    ports:
+      - "127.0.0.1:5673:5672"
+      - "127.0.0.1:15673:15672"
+      - "127.0.0.1:1884:1883"
+    environment:
+      <<: *rabbitmq-common-env
+      RABBITMQ_NODENAME: rabbit@rabbitmq-2
+    volumes:
+      - rabbitmq_2_data:/var/lib/rabbitmq
+      - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - ./infra/rabbitmq/generated:/etc/rabbitmq/generated:ro
+    networks:
+      - iot-backend
+
+  rabbitmq-3:
+    <<: *rabbitmq-common
+    hostname: rabbitmq-3
+    ports:
+      - "127.0.0.1:5674:5672"
+      - "127.0.0.1:15674:15672"
+      - "127.0.0.1:1885:1883"
+    environment:
+      <<: *rabbitmq-common-env
+      RABBITMQ_NODENAME: rabbit@rabbitmq-3
+    volumes:
+      - rabbitmq_3_data:/var/lib/rabbitmq
+      - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - ./infra/rabbitmq/generated:/etc/rabbitmq/generated:ro
+    networks:
+      - iot-backend
+
+  rabbitmq-topology:
+    image: rabbitmq:4.3-management
+    restart: "no"
+    environment:
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?RABBITMQ_VHOST is required}
+      RABBITMQ_ADMIN_USER: ${RABBITMQ_ADMIN_USER:?RABBITMQ_ADMIN_USER is required}
+      RABBITMQ_ADMIN_PASSWORD: ${RABBITMQ_ADMIN_PASSWORD:?RABBITMQ_ADMIN_PASSWORD is required}
+      RABBITMQ_CLUSTER_EXPECTED_NODES: 3
+    volumes:
+      - ./infra/rabbitmq/generated:/generated:ro
+      - ./infra/rabbitmq/scripts/import-topology.sh:/work/import-topology.sh:ro
+    entrypoint: ["/bin/sh", "/work/import-topology.sh"]
     depends_on:
-      rabbitmq-definitions:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      rabbitmq-1:
+        condition: service_healthy
+      rabbitmq-2:
+        condition: service_healthy
+      rabbitmq-3:
+        condition: service_healthy
     networks:
       - iot-backend
 
@@ -85,8 +154,8 @@ services:
     entrypoint: ["/bin/sh", "/opt/node-red-source/scripts/bootstrap-node-red.sh"]
     command: []
     depends_on:
-      rabbitmq:
-        condition: service_healthy
+      rabbitmq-topology:
+        condition: service_completed_successfully
     networks:
       - iot-backend
 
@@ -109,8 +178,8 @@ services:
       Mongo__DatabaseName: ${MONGO_APP_DATABASE:?MONGO_APP_DATABASE is required}
       Mongo__CollectionName: telemetry_events
     depends_on:
-      rabbitmq:
-        condition: service_healthy
+      rabbitmq-topology:
+        condition: service_completed_successfully
       mongodb:
         condition: service_healthy
     networks:
@@ -121,6 +190,8 @@ networks:
     driver: bridge
 
 volumes:
-  rabbitmq_data:
+  rabbitmq_1_data:
+  rabbitmq_2_data:
+  rabbitmq_3_data:
   mongodb_data:
   node_red_data:

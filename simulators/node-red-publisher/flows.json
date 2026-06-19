@@ -46,7 +46,7 @@
         "type": "comment",
         "z": "f0c7e86d4b2e1001",
         "name": "Setup",
-        "info": "RabbitMQ MQTT plugin: rabbitmq:1883 inside Docker Compose\nThe backend routes MQTT topics through iot.telemetry.exchange.\nUse topics like factory/telemetry/electricity/valid, factory/telemetry/steam/valid, factory/telemetry/gas/valid.",
+        "info": "RabbitMQ MQTT plugin: rabbitmq:1883 inside Docker Compose\nThe backend routes MQTT topics through iot.telemetry.exchange.\nUse topics like factory/telemetry/electricity/valid, factory/telemetry/steam/valid, and factory/telemetry/gas/valid.",
         "x": 190,
         "y": 40,
         "wires": []

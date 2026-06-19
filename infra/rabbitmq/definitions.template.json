@@ -89,6 +89,8 @@
       "auto_delete": false,
       "arguments": {
         "x-queue-type": "quorum",
+        "x-quorum-initial-group-size": 3,
+        "x-quorum-target-group-size": 3,
         "x-delivery-limit": 5,
         "x-delayed-retry-type": "all",
         "x-delayed-retry-min": 1000,
@@ -104,6 +106,8 @@
       "auto_delete": false,
       "arguments": {
         "x-queue-type": "quorum",
+        "x-quorum-initial-group-size": 3,
+        "x-quorum-target-group-size": 3,
         "x-delivery-limit": 5,
         "x-delayed-retry-type": "all",
         "x-delayed-retry-min": 1000,
@@ -119,6 +123,8 @@
       "auto_delete": false,
       "arguments": {
         "x-queue-type": "quorum",
+        "x-quorum-initial-group-size": 3,
+        "x-quorum-target-group-size": 3,
         "x-delivery-limit": 5,
         "x-delayed-retry-type": "all",
         "x-delayed-retry-min": 1000,
@@ -133,7 +139,9 @@
       "durable": true,
       "auto_delete": false,
       "arguments": {
-        "x-queue-type": "quorum"
+        "x-queue-type": "quorum",
+        "x-quorum-initial-group-size": 3,
+        "x-quorum-target-group-size": 3
       }
     },
     {
@@ -142,7 +150,9 @@
       "durable": true,
       "auto_delete": false,
       "arguments": {
-        "x-queue-type": "quorum"
+        "x-queue-type": "quorum",
+        "x-quorum-initial-group-size": 3,
+        "x-quorum-target-group-size": 3
       }
     },
     {
@@ -151,7 +161,9 @@
       "durable": true,
       "auto_delete": false,
       "arguments": {
-        "x-queue-type": "quorum"
+        "x-queue-type": "quorum",
+        "x-quorum-initial-group-size": 3,
+        "x-quorum-target-group-size": 3
       }
     }
   ],

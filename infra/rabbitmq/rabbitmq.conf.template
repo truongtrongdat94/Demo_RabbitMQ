@@ -11,6 +11,13 @@ mqtt.vhost = __RABBITMQ_VHOST__
 # Docker env and writes them to flows_cred.json before the runtime starts.
 mqtt.allow_anonymous = false
 
-definitions.import_backend = local_filesystem
-definitions.local.path = /etc/rabbitmq/generated/definitions.json
-definitions.skip_if_unchanged = true
+cluster_formation.peer_discovery_backend = classic_config
+cluster_formation.classic_config.nodes.1 = rabbit@rabbitmq-1
+cluster_formation.classic_config.nodes.2 = rabbit@rabbitmq-2
+cluster_formation.classic_config.nodes.3 = rabbit@rabbitmq-3
+
+cluster_partition_handling = pause_minority
+queue_leader_locator = balanced
+
+quorum_queue.continuous_membership_reconciliation.enabled = true
+quorum_queue.continuous_membership_reconciliation.target_group_size = 3
