@@ -32,6 +32,8 @@ for name in \
     RABBITMQ_ADMIN_PASSWORD \
     RABBITMQ_PUBLISHER_USER \
     RABBITMQ_PUBLISHER_PASSWORD \
+    RABBITMQ_DEVICE_USER \
+    RABBITMQ_DEVICE_PASSWORD \
     RABBITMQ_CONSUMER_USER \
     RABBITMQ_CONSUMER_PASSWORD
 do
@@ -41,6 +43,7 @@ done
 validate_identifier RABBITMQ_VHOST "$RABBITMQ_VHOST"
 validate_identifier RABBITMQ_ADMIN_USER "$RABBITMQ_ADMIN_USER"
 validate_identifier RABBITMQ_PUBLISHER_USER "$RABBITMQ_PUBLISHER_USER"
+validate_identifier RABBITMQ_DEVICE_USER "$RABBITMQ_DEVICE_USER"
 validate_identifier RABBITMQ_CONSUMER_USER "$RABBITMQ_CONSUMER_USER"
 
 hash_password() {
@@ -53,6 +56,7 @@ hash_password() {
 
 admin_password_hash="$(hash_password "$RABBITMQ_ADMIN_PASSWORD")"
 publisher_password_hash="$(hash_password "$RABBITMQ_PUBLISHER_PASSWORD")"
+device_password_hash="$(hash_password "$RABBITMQ_DEVICE_PASSWORD")"
 consumer_password_hash="$(hash_password "$RABBITMQ_CONSUMER_PASSWORD")"
 
 mkdir -p "$(dirname "$output_path")"
@@ -62,6 +66,8 @@ sed \
     -e "s@__RABBITMQ_ADMIN_PASSWORD_HASH__@$admin_password_hash@g" \
     -e "s@__RABBITMQ_PUBLISHER_USER__@$RABBITMQ_PUBLISHER_USER@g" \
     -e "s@__RABBITMQ_PUBLISHER_PASSWORD_HASH__@$publisher_password_hash@g" \
+    -e "s@__RABBITMQ_DEVICE_USER__@$RABBITMQ_DEVICE_USER@g" \
+    -e "s@__RABBITMQ_DEVICE_PASSWORD_HASH__@$device_password_hash@g" \
     -e "s@__RABBITMQ_CONSUMER_USER__@$RABBITMQ_CONSUMER_USER@g" \
     -e "s@__RABBITMQ_CONSUMER_PASSWORD_HASH__@$consumer_password_hash@g" \
     "$template_path" > "$output_path"

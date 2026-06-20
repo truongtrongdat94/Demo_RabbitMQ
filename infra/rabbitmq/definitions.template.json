@@ -22,6 +22,13 @@
       "limits": {}
     },
     {
+      "name": "__RABBITMQ_DEVICE_USER__",
+      "password_hash": "__RABBITMQ_DEVICE_PASSWORD_HASH__",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": [],
+      "limits": {}
+    },
+    {
       "name": "__RABBITMQ_CONSUMER_USER__",
       "password_hash": "__RABBITMQ_CONSUMER_PASSWORD_HASH__",
       "hashing_algorithm": "rabbit_password_hashing_sha256",
@@ -45,6 +52,13 @@
       "read": "^$"
     },
     {
+      "user": "__RABBITMQ_DEVICE_USER__",
+      "vhost": "__RABBITMQ_VHOST__",
+      "configure": "^mqtt-subscription-qos0-device-01qos0$",
+      "write": "^mqtt-subscription-qos0-device-01qos0$",
+      "read": "^(iot\\.telemetry\\.exchange|mqtt-subscription-qos0-device-01qos0)$"
+    },
+    {
       "user": "__RABBITMQ_CONSUMER_USER__",
       "vhost": "__RABBITMQ_VHOST__",
       "configure": "^$",
@@ -59,6 +73,13 @@
       "exchange": "iot.telemetry.exchange",
       "write": "^factory\\.telemetry\\.(electricity|steam|gas)\\..*$",
       "read": "^$"
+    },
+    {
+      "user": "__RABBITMQ_DEVICE_USER__",
+      "vhost": "__RABBITMQ_VHOST__",
+      "exchange": "iot.telemetry.exchange",
+      "write": "^$",
+      "read": "^factory\\.device\\.qos0-device-01\\.command(\\..*)?$"
     }
   ],
   "exchanges": [

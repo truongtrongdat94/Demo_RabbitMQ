@@ -5,6 +5,8 @@ const crypto = require("crypto");
 const required = [
     "NODE_RED_MQTT_USERNAME",
     "NODE_RED_MQTT_PASSWORD",
+    "NODE_RED_DEVICE_MQTT_USERNAME",
+    "NODE_RED_DEVICE_MQTT_PASSWORD",
     "NODE_RED_CREDENTIAL_SECRET"
 ];
 
@@ -19,6 +21,10 @@ const credentials = {
     f0c7e86d4b2e1002: {
         user: process.env.NODE_RED_MQTT_USERNAME,
         password: process.env.NODE_RED_MQTT_PASSWORD
+    },
+    f0c7e86d4b2e2002: {
+        user: process.env.NODE_RED_DEVICE_MQTT_USERNAME,
+        password: process.env.NODE_RED_DEVICE_MQTT_PASSWORD
     }
 };
 
