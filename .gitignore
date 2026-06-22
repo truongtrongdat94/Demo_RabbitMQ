@@ -1,4 +1,2 @@
 .env
 *.log
-infra/rabbitmq/generated/*
-!infra/rabbitmq/generated/.gitkeep

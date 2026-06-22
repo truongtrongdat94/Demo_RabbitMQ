@@ -2,9 +2,9 @@
     {
         "id": "f0c7e86d4b2e1001",
         "type": "tab",
-        "label": "MQTT Pet Project",
+        "label": "IoT Telemetry Publisher",
         "disabled": false,
-        "info": "Publish test telemetry to RabbitMQ MQTT plugin for the current mqttpetproject topology."
+        "info": "Publish test telemetry to RabbitMQ MQTT plugin for the current IoT telemetry topology."
     },
     {
         "id": "f0c7e86d4b2e1003",
@@ -330,7 +330,7 @@
     {
         "id": "f0c7e86d4b2e1002",
         "type": "mqtt-broker",
-        "name": "RabbitMQ MQTT Docker",
+        "name": "RabbitMQ MQTT Broker",
         "broker": "rabbitmq",
         "port": "1883",
         "clientid": "",

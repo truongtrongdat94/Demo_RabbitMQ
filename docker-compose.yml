@@ -6,9 +6,6 @@ x-rabbitmq-common: &rabbitmq-common
   environment: &rabbitmq-common-env
     RABBITMQ_CONFIG_FILE: /etc/rabbitmq/generated/rabbitmq
     RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:?RABBITMQ_ERLANG_COOKIE is required}
-    RABBITMQ_DEFAULT_USER: ${RABBITMQ_ADMIN_USER:?RABBITMQ_ADMIN_USER is required}
-    RABBITMQ_DEFAULT_PASS: ${RABBITMQ_ADMIN_PASSWORD:?RABBITMQ_ADMIN_PASSWORD is required}
-    RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:?RABBITMQ_VHOST is required}
   depends_on:
     rabbitmq-definitions:
       condition: service_completed_successfully
@@ -35,7 +32,7 @@ services:
       - ./infra/rabbitmq/definitions.template.json:/work/definitions.template.json:ro
       - ./infra/rabbitmq/rabbitmq.conf.template:/work/rabbitmq.conf.template:ro
       - ./infra/rabbitmq/scripts/render-definitions.sh:/work/render-definitions.sh:ro
-      - ./infra/rabbitmq/generated:/generated
+      - rabbitmq_generated_config:/generated
     entrypoint: ["/bin/sh", "/work/render-definitions.sh"]
 
   rabbitmq-1:
@@ -51,7 +48,7 @@ services:
     volumes:
       - rabbitmq_1_data:/var/lib/rabbitmq
       - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
-      - ./infra/rabbitmq/generated:/etc/rabbitmq/generated:ro
+      - rabbitmq_generated_config:/etc/rabbitmq/generated:ro
     networks:
       iot-backend:
         aliases:
@@ -70,7 +67,7 @@ services:
     volumes:
       - rabbitmq_2_data:/var/lib/rabbitmq
       - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
-      - ./infra/rabbitmq/generated:/etc/rabbitmq/generated:ro
+      - rabbitmq_generated_config:/etc/rabbitmq/generated:ro
     networks:
       - iot-backend
 
@@ -87,29 +84,7 @@ services:
     volumes:
       - rabbitmq_3_data:/var/lib/rabbitmq
       - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
-      - ./infra/rabbitmq/generated:/etc/rabbitmq/generated:ro
-    networks:
-      - iot-backend
-
-  rabbitmq-topology:
-    image: rabbitmq:4.3-management
-    restart: "no"
-    environment:
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?RABBITMQ_VHOST is required}
-      RABBITMQ_ADMIN_USER: ${RABBITMQ_ADMIN_USER:?RABBITMQ_ADMIN_USER is required}
-      RABBITMQ_ADMIN_PASSWORD: ${RABBITMQ_ADMIN_PASSWORD:?RABBITMQ_ADMIN_PASSWORD is required}
-      RABBITMQ_CLUSTER_EXPECTED_NODES: 3
-    volumes:
-      - ./infra/rabbitmq/generated:/generated:ro
-      - ./infra/rabbitmq/scripts/import-topology.sh:/work/import-topology.sh:ro
-    entrypoint: ["/bin/sh", "/work/import-topology.sh"]
-    depends_on:
-      rabbitmq-1:
-        condition: service_healthy
-      rabbitmq-2:
-        condition: service_healthy
-      rabbitmq-3:
-        condition: service_healthy
+      - rabbitmq_generated_config:/etc/rabbitmq/generated:ro
     networks:
       - iot-backend
 
@@ -140,7 +115,7 @@ services:
     image: nodered/node-red:4.0.9
     restart: unless-stopped
     ports:
-      - "127.0.0.1:1880:1880"
+      - "127.0.0.1:18080:1880"
     environment:
       TZ: Asia/Bangkok
       NODE_RED_CREDENTIAL_SECRET: ${NODE_RED_CREDENTIAL_SECRET:?NODE_RED_CREDENTIAL_SECRET is required}
@@ -154,8 +129,12 @@ services:
     entrypoint: ["/bin/sh", "/opt/node-red-source/scripts/bootstrap-node-red.sh"]
     command: []
     depends_on:
-      rabbitmq-topology:
-        condition: service_completed_successfully
+      rabbitmq-1:
+        condition: service_healthy
+      rabbitmq-2:
+        condition: service_healthy
+      rabbitmq-3:
+        condition: service_healthy
     networks:
       - iot-backend
 
@@ -178,8 +157,12 @@ services:
       Mongo__DatabaseName: ${MONGO_APP_DATABASE:?MONGO_APP_DATABASE is required}
       Mongo__CollectionName: telemetry_events
     depends_on:
-      rabbitmq-topology:
-        condition: service_completed_successfully
+      rabbitmq-1:
+        condition: service_healthy
+      rabbitmq-2:
+        condition: service_healthy
+      rabbitmq-3:
+        condition: service_healthy
       mongodb:
         condition: service_healthy
     networks:
@@ -190,6 +173,7 @@ networks:
     driver: bridge
 
 volumes:
+  rabbitmq_generated_config:
   rabbitmq_1_data:
   rabbitmq_2_data:
   rabbitmq_3_data:

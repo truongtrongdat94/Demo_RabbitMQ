@@ -1,14 +1,11 @@
-# Local development configuration for the IoT data pipeline.
-
 listeners.tcp.default = 5672
 management.tcp.port = 15672
+management.load_definitions = /etc/rabbitmq/generated/definitions.json
 
 mqtt.listeners.tcp.default = 1883
 mqtt.exchange = iot.telemetry.exchange
 mqtt.vhost = __RABBITMQ_VHOST__
 
-# MQTT clients must authenticate. Node-RED receives publisher credentials from
-# Docker env and writes them to flows_cred.json before the runtime starts.
 mqtt.allow_anonymous = false
 
 cluster_formation.peer_discovery_backend = classic_config
@@ -16,7 +13,6 @@ cluster_formation.classic_config.nodes.1 = rabbit@rabbitmq-1
 cluster_formation.classic_config.nodes.2 = rabbit@rabbitmq-2
 cluster_formation.classic_config.nodes.3 = rabbit@rabbitmq-3
 
-cluster_partition_handling = pause_minority
 queue_leader_locator = balanced
 
 quorum_queue.continuous_membership_reconciliation.enabled = true

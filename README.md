@@ -53,13 +53,13 @@ Node-RED MQTT credentials are rendered into `flows_cred.json` from the RabbitMQ 
 Node-RED runtime state is stored in the Docker named volume `node_red_data`; the repository keeps only source flow/config files.
 The consumer service starts with the stack and subscribes to all telemetry domain queues.
 
-RabbitMQ topology, users, permissions, and topic permissions are rendered from `infra/rabbitmq/definitions.template.json` into `infra/rabbitmq/generated/definitions.json` before RabbitMQ starts. The generated file contains password hashes and is ignored by Git.
+RabbitMQ topology, users, permissions, and topic permissions are rendered from `infra/rabbitmq/definitions.template.json` into the Docker named volume `rabbitmq_generated_config` before RabbitMQ starts. RabbitMQ loads that generated definitions file at broker startup through `management.load_definitions`. Generated files contain password hashes and do not live in the repository source tree.
 
 If credentials or topology were changed after a previous run, RabbitMQ and MongoDB named volumes may still contain old users/data. Recreate volumes only when the stored data is disposable.
 
 ## Routing
 
-RabbitMQ imports the following topology into the `iot` virtual host:
+RabbitMQ loads the following topology into the `iot` virtual host:
 
 ```text
 iot.telemetry.exchange -- factory.telemetry.electricity.# --> telemetry.electricity.queue
@@ -109,9 +109,11 @@ Processing policy:
 valid save cases       -> validate, upsert into MongoDB, ACK
 VALID_NO_SAVE          -> validate, log, ACK
 INVALID_SCHEMA         -> reject requeue=false, route to DLQ
-VALID_FORCE_DB_ERROR   -> NACK requeue=true, let quorum delayed retry handle it
-unexpected/transient   -> NACK requeue=true, let quorum delayed retry handle it
+VALID_FORCE_DB_ERROR   -> reject requeue=true, let quorum delayed retry handle it
+unexpected/transient   -> reject requeue=true, let quorum delayed retry handle it
 ```
+
+The processor validates the top-level telemetry envelope and nested gateway/device structure before applying the test-case action. `Meta.TestCase` selects the scenario required by the assignment, while `Simulate.NoSave` and `Simulate.ForceDbError` must match that scenario.
 
 ## RabbitMQ Access Model
 
