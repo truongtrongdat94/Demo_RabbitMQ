@@ -26,9 +26,9 @@ The consumer is a standalone .NET 10 Worker Service packaged as its own containe
 
 | Service | URL / Port | Purpose |
 | --- | --- | --- |
-| Node-RED | http://localhost:1880 | Data publisher simulator |
+| Node-RED | http://localhost:18080 | Data publisher simulator |
 | RabbitMQ Management | http://localhost:15672 | Broker UI |
-| RabbitMQ MQTT | localhost:1883 | MQTT ingestion endpoint |
+| RabbitMQ MQTT | localhost:11883 | MQTT ingestion endpoint |
 | RabbitMQ AMQP | localhost:5672 | Consumer connection endpoint |
 | MongoDB | localhost:27017 | Telemetry persistence |
 | Consumer Service | container only | AMQP consumer and MongoDB writer |
@@ -48,7 +48,7 @@ docker compose up -d
 docker compose ps
 ```
 
-Open Node-RED at http://localhost:1880 and trigger the provided inject nodes.
+Open Node-RED at http://localhost:18080 and trigger the provided inject nodes.
 Node-RED MQTT credentials are rendered into `flows_cred.json` from the RabbitMQ publisher service account in `.env` when the container starts.
 Node-RED runtime state is stored in the Docker named volume `node_red_data`; the repository keeps only source flow/config files.
 The consumer service starts with the stack and subscribes to all telemetry domain queues.
