@@ -1,0 +1,168 @@
+name: iot-data-pipeline
+
+x-rabbitmq-common: &rabbitmq-common
+  image: "${IMAGE_REGISTRY:?IMAGE_REGISTRY is required}/iot-data-pipeline-rabbitmq:${IMAGE_TAG:-1.0.0}"
+  restart: unless-stopped
+  environment: &rabbitmq-common-env
+    RABBITMQ_CONFIG_FILE: /etc/rabbitmq/generated/rabbitmq
+    RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:?RABBITMQ_ERLANG_COOKIE is required}
+  depends_on:
+    rabbitmq-definitions:
+      condition: service_completed_successfully
+  healthcheck:
+    test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
+
+services:
+  rabbitmq-definitions:
+    image: "${IMAGE_REGISTRY:?IMAGE_REGISTRY is required}/iot-data-pipeline-rabbitmq:${IMAGE_TAG:-1.0.0}"
+    restart: "no"
+    network_mode: none
+    environment:
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?RABBITMQ_VHOST is required}
+      RABBITMQ_ADMIN_USER: ${RABBITMQ_ADMIN_USER:?RABBITMQ_ADMIN_USER is required}
+      RABBITMQ_ADMIN_PASSWORD: ${RABBITMQ_ADMIN_PASSWORD:?RABBITMQ_ADMIN_PASSWORD is required}
+      RABBITMQ_PUBLISHER_USER: ${RABBITMQ_PUBLISHER_USER:?RABBITMQ_PUBLISHER_USER is required}
+      RABBITMQ_PUBLISHER_PASSWORD: ${RABBITMQ_PUBLISHER_PASSWORD:?RABBITMQ_PUBLISHER_PASSWORD is required}
+      RABBITMQ_CONSUMER_USER: ${RABBITMQ_CONSUMER_USER:?RABBITMQ_CONSUMER_USER is required}
+      RABBITMQ_CONSUMER_PASSWORD: ${RABBITMQ_CONSUMER_PASSWORD:?RABBITMQ_CONSUMER_PASSWORD is required}
+    volumes:
+      - rabbitmq_generated_config:/generated
+    entrypoint: ["/bin/sh", "/work/render-definitions.sh"]
+
+  rabbitmq-1:
+    <<: *rabbitmq-common
+    hostname: rabbitmq-1
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:11883:1883"
+    environment:
+      <<: *rabbitmq-common-env
+      RABBITMQ_NODENAME: rabbit@rabbitmq-1
+    volumes:
+      - rabbitmq_1_data:/var/lib/rabbitmq
+      - rabbitmq_generated_config:/etc/rabbitmq/generated:ro
+    networks:
+      iot-backend:
+        aliases:
+          - rabbitmq
+
+  rabbitmq-2:
+    <<: *rabbitmq-common
+    hostname: rabbitmq-2
+    ports:
+      - "127.0.0.1:5673:5672"
+      - "127.0.0.1:15673:15672"
+      - "127.0.0.1:11884:1883"
+    environment:
+      <<: *rabbitmq-common-env
+      RABBITMQ_NODENAME: rabbit@rabbitmq-2
+    volumes:
+      - rabbitmq_2_data:/var/lib/rabbitmq
+      - rabbitmq_generated_config:/etc/rabbitmq/generated:ro
+    networks:
+      - iot-backend
+
+  rabbitmq-3:
+    <<: *rabbitmq-common
+    hostname: rabbitmq-3
+    ports:
+      - "127.0.0.1:5674:5672"
+      - "127.0.0.1:15674:15672"
+      - "127.0.0.1:11885:1883"
+    environment:
+      <<: *rabbitmq-common-env
+      RABBITMQ_NODENAME: rabbit@rabbitmq-3
+    volumes:
+      - rabbitmq_3_data:/var/lib/rabbitmq
+      - rabbitmq_generated_config:/etc/rabbitmq/generated:ro
+    networks:
+      - iot-backend
+
+  mongodb:
+    image: "${IMAGE_REGISTRY:?IMAGE_REGISTRY is required}/iot-data-pipeline-mongodb:${IMAGE_TAG:-1.0.0}"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?MONGO_INITDB_ROOT_USERNAME is required}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?MONGO_INITDB_ROOT_PASSWORD is required}
+      MONGO_INITDB_DATABASE: ${MONGO_APP_DATABASE:?MONGO_APP_DATABASE is required}
+      MONGO_APP_DATABASE: ${MONGO_APP_DATABASE:?MONGO_APP_DATABASE is required}
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME:?MONGO_APP_USERNAME is required}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:?MONGO_APP_PASSWORD is required}
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "-u", "${MONGO_INITDB_ROOT_USERNAME}", "-p", "${MONGO_INITDB_ROOT_PASSWORD}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - iot-backend
+
+  node-red:
+    image: "${IMAGE_REGISTRY:?IMAGE_REGISTRY is required}/iot-data-pipeline-node-red:${IMAGE_TAG:-1.0.0}"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18080:1880"
+    environment:
+      TZ: Asia/Bangkok
+      NODE_RED_CREDENTIAL_SECRET: ${NODE_RED_CREDENTIAL_SECRET:?NODE_RED_CREDENTIAL_SECRET is required}
+      NODE_RED_MQTT_USERNAME: ${RABBITMQ_PUBLISHER_USER:?RABBITMQ_PUBLISHER_USER is required}
+      NODE_RED_MQTT_PASSWORD: ${RABBITMQ_PUBLISHER_PASSWORD:?RABBITMQ_PUBLISHER_PASSWORD is required}
+    volumes:
+      - node_red_data:/data
+    depends_on:
+      rabbitmq-1:
+        condition: service_healthy
+      rabbitmq-2:
+        condition: service_healthy
+      rabbitmq-3:
+        condition: service_healthy
+    networks:
+      - iot-backend
+
+  consumer-service:
+    image: "${IMAGE_REGISTRY:?IMAGE_REGISTRY is required}/iot-data-pipeline-consumer-service:${IMAGE_TAG:-1.0.0}"
+    restart: unless-stopped
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__VirtualHost: ${RABBITMQ_VHOST:?RABBITMQ_VHOST is required}
+      RabbitMq__UserName: ${RABBITMQ_CONSUMER_USER:?RABBITMQ_CONSUMER_USER is required}
+      RabbitMq__Password: ${RABBITMQ_CONSUMER_PASSWORD:?RABBITMQ_CONSUMER_PASSWORD is required}
+      RabbitMq__Queues__0: telemetry.electricity.queue
+      RabbitMq__Queues__1: telemetry.steam.queue
+      RabbitMq__Queues__2: telemetry.gas.queue
+      RabbitMq__PrefetchCount: ${CONSUMER_RABBITMQ_PREFETCH:-8}
+      Mongo__ConnectionString: ${CONSUMER_MONGO_CONNECTION_STRING:?CONSUMER_MONGO_CONNECTION_STRING is required}
+      Mongo__DatabaseName: ${MONGO_APP_DATABASE:?MONGO_APP_DATABASE is required}
+      Mongo__CollectionName: telemetry_events
+    depends_on:
+      rabbitmq-1:
+        condition: service_healthy
+      rabbitmq-2:
+        condition: service_healthy
+      rabbitmq-3:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - iot-backend
+
+networks:
+  iot-backend:
+    driver: bridge
+
+volumes:
+  rabbitmq_generated_config:
+  rabbitmq_1_data:
+  rabbitmq_2_data:
+  rabbitmq_3_data:
+  mongodb_data:
+  node_red_data:
