@@ -4,21 +4,19 @@
 
 This document describes the primary project deliverable: a QoS 1 MQTT telemetry pipeline backed by RabbitMQ quorum queues and a standalone C# consumer service.
 
-The QoS 0 clean-session device design is treated as an optional extension, not the main assessment path. The required demonstration focuses on routing telemetry data from Node-RED into RabbitMQ, proving that electricity, steam, and gas messages are routed into the correct queues, and showing that the consumer can process those messages.
-
 ## 2. What The System Does
 
 Node-RED simulates IoT devices and publishes telemetry messages to RabbitMQ using MQTT QoS 1.
 
 RabbitMQ receives MQTT messages through the MQTT plugin, maps MQTT topics to AMQP routing keys, and routes them through a custom topic exchange:
 
-```text
+```
 iot.telemetry.exchange
 ```
 
 The exchange routes messages into durable quorum queues:
 
-```text
+```
 telemetry.electricity.queue
 telemetry.steam.queue
 telemetry.gas.queue
@@ -30,18 +28,20 @@ A standalone C# consumer service subscribes to those queues, validates incoming 
 
 | Component | Responsibility | Local Access |
 | --- | --- | --- |
-| Node-RED | Simulates IoT publishers and sends MQTT QoS 1 telemetry | http://localhost:1880 |
-| RabbitMQ 4.3 cluster | MQTT listener, custom exchange, quorum queues, DLQ topology | http://localhost:15672 |
-| MongoDB | Stores valid telemetry documents | localhost:27017 |
+| Node-RED | Simulates IoT publishers and sends MQTT QoS 1 telemetry | [http://localhost:18080](http://localhost:18080) |
+| RabbitMQ 4.3 cluster | MQTT listener, custom exchange, quorum queues, DLQ topology | [http://localhost:15672](http://localhost:15672) |
+| MongoDB | Stores valid telemetry documents | [localhost:27017](http://localhost:27017) |
 | C# Consumer Service | Consumes RabbitMQ domain queues and applies processing rules | Docker service: `consumer-service` |
 
 RabbitMQ runs as a three-node local cluster:
 
 | Node | AMQP | Management UI | MQTT |
 | --- | --- | --- | --- |
-| `rabbitmq-1` | `5672` | `15672` | `1883` |
-| `rabbitmq-2` | `5673` | `15673` | `1884` |
-| `rabbitmq-3` | `5674` | `15674` | `1885` |
+| `rabbitmq-1` | `5672` | `15672` | `18883` |
+| `rabbitmq-2` | `5673` | `15673` | `18884` |
+| `rabbitmq-3` | `5674` | `15674` | `18885` |
+
+![image.png](image.png)
 
 ## 4. Primary Architecture
 
@@ -63,40 +63,15 @@ flowchart LR
     CS -->|"transient failure<br/>Reject requeue=true"| RETRY["Quorum delayed retry"]
 ```
 
-Screenshot placeholder:
-
-```text
-[Screenshot: Node-RED flow showing MQTT QoS 1 publisher and telemetry inject nodes]
-```
-
-Video placeholder:
-
-```text
-[Video/GIF: Inject telemetry in Node-RED -> RabbitMQ queue receives it -> consumer processes it -> MongoDB document is created]
-```
-
 ## 5. RabbitMQ Topology
 
 The project uses a custom topic exchange instead of using `amq.topic` as the final business exchange:
 
-```text
+```
 iot.telemetry.exchange
 ```
 
 This makes the application routing topology explicit and separates business routing from RabbitMQ's built-in exchanges.
-
-The RabbitMQ topology is rendered from source-controlled templates before broker startup:
-
-```text
-infra/rabbitmq/definitions.template.json -> rabbitmq_generated_config:/generated/definitions.json
-infra/rabbitmq/rabbitmq.conf.template    -> rabbitmq_generated_config:/generated/rabbitmq.conf
-```
-
-RabbitMQ then loads the rendered definitions through:
-
-```text
-management.load_definitions = /etc/rabbitmq/generated/definitions.json
-```
 
 ### Processing Queues
 
@@ -120,7 +95,7 @@ These queues are durable quorum queues. They are the main processing queues cons
 
 Domain queues use quorum and delayed retry settings:
 
-```text
+```
 x-queue-type = quorum
 x-quorum-initial-group-size = 3
 x-quorum-target-group-size = 3
@@ -130,13 +105,21 @@ x-delayed-retry-min = 1000
 x-delayed-retry-max = 30000
 ```
 
-Screenshot placeholder:
+![image.png](image%201.png)
 
-```text
-[Screenshot: RabbitMQ Queues page showing telemetry.electricity.queue, telemetry.steam.queue, and telemetry.gas.queue with type quorum]
-```
+## 6. Quorum Replica And Leader Promotion
 
-## 6. MQTT Topic Routing
+Quorum queues have one leader and replicated followers. In RabbitMQ UI, `rabbit@rabbitmq-2 +2` means the queue leader is on `rabbitmq-2` and two other nodes hold replicas. If the leader container stops and a majority is still available, RabbitMQ promotes another replica.
+
+Before stop node rabbitmq-3:
+
+![image.png](image%202.png)
+
+After stop node rabbitmq-3:
+
+![image.png](image%203.png)
+
+## 7. MQTT Topic Routing
 
 Node-RED publishes slash-style MQTT topics. RabbitMQ MQTT plugin maps slash-separated MQTT topics into dot-separated AMQP routing keys.
 
@@ -151,7 +134,7 @@ Node-RED publishes slash-style MQTT topics. RabbitMQ MQTT plugin maps slash-sepa
 
 RabbitMQ bindings:
 
-```text
+```
 factory.telemetry.electricity.# -> telemetry.electricity.queue
 factory.telemetry.steam.#       -> telemetry.steam.queue
 factory.telemetry.gas.#         -> telemetry.gas.queue
@@ -159,24 +142,14 @@ factory.telemetry.gas.#         -> telemetry.gas.queue
 
 This proves that different telemetry domains are routed through the same custom exchange into their designated domain queues.
 
-Screenshot placeholder:
+![image.png](image%204.png)
 
-```text
-[Screenshot: RabbitMQ exchange iot.telemetry.exchange showing bindings for electricity, steam, and gas]
-```
-
-## 7. Data Publisher Simulation
+## 8. Data Publisher Simulation
 
 The Node-RED flow is stored at:
 
-```text
-simulators/node-red-publisher/flows.json
 ```
-
-The active Node-RED tab is:
-
-```text
-IoT Telemetry Publisher
+simulators/node-red-publisher/flows.json
 ```
 
 The MQTT output node is configured with QoS 1. This means the MQTT protocol uses PUBACK for at-least-once delivery between Node-RED and RabbitMQ. Node-RED does not need custom code to manually process PUBACK; the MQTT client implementation handles that protocol behavior.
@@ -192,23 +165,19 @@ Manual inject test cases:
 | Steam Valid | `STEAM_VALID` | Routed to steam queue, saved to MongoDB, ACKed |
 | Gas Valid | `GAS_VALID` | Routed to gas queue, saved to MongoDB, ACKed |
 
-Screenshot placeholder:
+![image.png](image%205.png)
 
-```text
-[Screenshot: Node-RED inject nodes for valid, invalid, no-save, db-error, steam, and gas test cases]
-```
-
-## 8. Consumer Application
+## 9. Consumer Application
 
 The consumer is a standalone C# service located at:
 
-```text
+```
 apps/consumer-service
 ```
 
 It connects to RabbitMQ over AMQP 0-9-1 and subscribes to three domain queues:
 
-```text
+```
 telemetry.electricity.queue
 telemetry.steam.queue
 telemetry.gas.queue
@@ -216,101 +185,66 @@ telemetry.gas.queue
 
 The consumer uses one connection and separate channels for the subscribed queues.
 
-Before applying a test-case action, the consumer validates both the telemetry schema and the demo control contract. Required payload fields include:
-
-```text
-MessageId
-CorrelationId
-Source
-SchemaVersion
-MessageType
-ID_Gateway
-Timestamp_Gateway
-Data_Gateway[].Topic
-Data_Gateway[].Data_Devices[].ID_Device
-Data_Gateway[].Data_Devices[].Type_Device
-Data_Gateway[].Data_Devices[].Timestamp_Device
-Data_Gateway[].Data_Devices[].Reading_Device
-Meta.TestCase
-Simulate.NoSave
-Simulate.ForceDbError
-```
-
-`Meta.TestCase` selects the assignment scenario. `Simulate.NoSave` and `Simulate.ForceDbError` must match that scenario before the message is saved, skipped, or retried. For `INVALID_SCHEMA`, the expected outcome is that schema validation fails before the test-case action is applied.
-
 ```mermaid
 flowchart TD
     MSG["Message received from RabbitMQ"] --> PARSE["Parse JSON"]
-    PARSE --> VALIDATE["Validate telemetry schema<br/>gateway, devices, readings"]
-    VALIDATE --> CONTRACT["Validate Meta.TestCase<br/>and Simulate flags"]
-    CONTRACT --> CASE["Apply test-case action"]
+    PARSE --> VALIDATE["Validate required telemetry fields"]
+    VALIDATE --> CASE["Read Meta.TestCase"]
 
     CASE -->|"VALID_SAVE_DB / STEAM_VALID / GAS_VALID"| SAVE["Upsert telemetry document into MongoDB"]
     SAVE --> ACK["BasicAck"]
 
-    CASE -->|"VALID_NO_SAVE<br/>Simulate.NoSave=true"| NOSAVE["Log payload only"]
+    CASE -->|"VALID_NO_SAVE"| NOSAVE["Validate only"]
     NOSAVE --> ACK
 
     CASE -->|"INVALID_SCHEMA / unsupported case"| PERM["Permanent failure"]
     PERM --> REJECT_FALSE["BasicReject requeue=false"]
     REJECT_FALSE --> DLQ["DLQ"]
 
-    CASE -->|"VALID_FORCE_DB_ERROR<br/>Simulate.ForceDbError=true"| TRANSIENT["Simulated transient failure"]
+    CASE -->|"VALID_FORCE_DB_ERROR / MongoDB transient error"| TRANSIENT["Transient failure"]
     TRANSIENT --> REJECT_TRUE["BasicReject requeue=true"]
     REJECT_TRUE --> RETRY["Quorum delayed retry"]
 ```
 
 Expected consumer logs:
 
-```text
+```
 Persisted telemetry message <MessageId> from queue telemetry.electricity.queue
 Rejecting permanent failure from queue telemetry.electricity.queue
 Rejecting transient failure from queue telemetry.electricity.queue; requeue=true
 ```
 
-Screenshot placeholder:
+![image.png](image%206.png)
 
-```text
-[Screenshot: consumer-service logs showing persisted, rejected, and retried messages]
-```
-
-## 9. MongoDB Persistence
+## 10. MongoDB Persistence
 
 Valid telemetry messages are saved into MongoDB:
 
-```text
+```
 database: iot_telemetry
 collection: telemetry_events
 ```
 
 The consumer upserts by `MessageId`, which makes repeated delivery safer for demonstration because duplicated QoS 1 messages do not create duplicate documents with the same message identity.
 
-Screenshot placeholder:
+![image.png](image%207.png)
 
-```text
-[Screenshot: MongoDB telemetry_events collection showing a saved telemetry document]
-```
-
-## 10. Security And Production-Style Choices
+## 11. Security And Production-Style Choices
 
 | Area | Implementation |
 | --- | --- |
 | MQTT authentication | Anonymous MQTT access is disabled |
 | RabbitMQ users | Separate users for admin, publisher, and consumer |
-| RabbitMQ topology | Definitions are rendered from source-controlled templates and loaded at broker startup |
+| RabbitMQ topology | Definitions are rendered and imported from source-controlled templates |
 | RabbitMQ passwords | Password hashes are generated with `rabbitmqctl hash_password` |
 | Node-RED credentials | `flows_cred.json` is generated at startup and not committed |
 | MongoDB authentication | MongoDB root and app users are configured through env and init script |
 | Queue durability | Processing queues and DLQs are quorum queues |
 | Permissions | Publisher can write telemetry topics; consumer can read only domain queues |
 
-## 11. Runbook
+![image.png](image%208.png)
 
-For the full presentation script, use:
-
-```text
-docs/live-demo.md
-```
+## 12. Runbook
 
 Start the stack:
 
@@ -320,7 +254,7 @@ docker compose up -d
 
 Open UIs:
 
-```text
+```
 Node-RED: http://localhost:1880
 RabbitMQ: http://localhost:15672
 ```
@@ -349,42 +283,19 @@ Watch Node-RED logs:
 docker compose logs -f node-red
 ```
 
-## 12. Demonstration Checklist
-
-| Step | Evidence To Capture | Status |
-| --- | --- | --- |
-| Start the stack | `docker compose up -d` completes | Pending evidence |
-| Show architecture | Mermaid diagram or exported image | Pending evidence |
-| Show publisher | Node-RED flow with MQTT QoS 1 output | Pending evidence |
-| Prove topic routing | RabbitMQ exchange bindings and domain queues | Pending evidence |
-| Prove electricity route | Electricity message appears in `telemetry.electricity.queue` | Pending evidence |
-| Prove steam route | Steam message appears in `telemetry.steam.queue` | Pending evidence |
-| Prove gas route | Gas message appears in `telemetry.gas.queue` | Pending evidence |
-| Prove consumer subscription | Queue list shows consumers on the three domain queues | Pending evidence |
-| Prove valid persistence | Consumer log and MongoDB document | Pending evidence |
-| Prove invalid DLQ | Invalid message reaches `telemetry.electricity.dlq` | Pending evidence |
-| Prove transient retry | DB error test follows quorum delayed retry behavior | Pending evidence |
-| Prove quorum type | Queue list shows `telemetry.*.queue` as `quorum` | Pending evidence |
-
-Video placeholder:
-
-```text
-[Video/GIF: Node-RED inject -> RabbitMQ domain queue -> C# consumer log -> MongoDB document]
-```
-
 ## 13. Optional Extension: QoS 0 Clean-Session Device
 
 QoS 0 is not the main task requirement in this document. It is an optional design extension for a different use case: lightweight command delivery to online MQTT devices.
 
 In that model:
 
-```text
+```
 AMQP or MQTT publisher -> iot.telemetry.exchange -> MQTT QoS 0 subscriber
 ```
 
 RabbitMQ can create a runtime MQTT QoS 0 subscription queue for a clean-session MQTT subscriber:
 
-```text
+```
 mqtt-subscription-<client-id>qos0
 ```
 
@@ -396,8 +307,6 @@ Comparison:
 | --- | --- | --- | --- |
 | QoS 1 telemetry processing | C# AMQP consumer | quorum | Reliable telemetry processing, retry, DLQ, MongoDB persistence |
 | QoS 0 clean-session device | MQTT subscriber | MQTT QoS 0 queue | Lightweight command delivery to online devices |
-
-The QoS 0 design is useful to discuss as an extension, but the deliverable demonstration should lead with the QoS 1 telemetry pipeline because that is the core requirement.
 
 ## 14. Design Decisions
 
@@ -412,10 +321,6 @@ Electricity, steam, and gas have separate queues. This makes the routing proof c
 ### Quorum Queues
 
 Quorum queues are used for processing queues because telemetry data should survive node failures and support delayed retry/DLQ behavior.
-
-### Standalone Consumer Service
-
-The C# service is standalone from RabbitMQ and MongoDB. It connects through Docker networking, subscribes to multiple domain queues, and owns the application-level processing rules.
 
 ### QoS 0 As An Extension
 
