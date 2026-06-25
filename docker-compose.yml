@@ -39,9 +39,7 @@ services:
     <<: *rabbitmq-common
     hostname: rabbitmq-1
     ports:
-      - "127.0.0.1:5672:5672"
       - "127.0.0.1:15672:15672"
-      - "127.0.0.1:11883:1883"
     environment:
       <<: *rabbitmq-common-env
       RABBITMQ_NODENAME: rabbit@rabbitmq-1
@@ -50,17 +48,13 @@ services:
       - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
       - rabbitmq_generated_config:/etc/rabbitmq/generated:ro
     networks:
-      iot-backend:
-        aliases:
-          - rabbitmq
+      - iot-backend
 
   rabbitmq-2:
     <<: *rabbitmq-common
     hostname: rabbitmq-2
     ports:
-      - "127.0.0.1:5673:5672"
       - "127.0.0.1:15673:15672"
-      - "127.0.0.1:11884:1883"
     environment:
       <<: *rabbitmq-common-env
       RABBITMQ_NODENAME: rabbit@rabbitmq-2
@@ -75,9 +69,7 @@ services:
     <<: *rabbitmq-common
     hostname: rabbitmq-3
     ports:
-      - "127.0.0.1:5674:5672"
       - "127.0.0.1:15674:15672"
-      - "127.0.0.1:11885:1883"
     environment:
       <<: *rabbitmq-common-env
       RABBITMQ_NODENAME: rabbit@rabbitmq-3
@@ -85,6 +77,30 @@ services:
       - rabbitmq_3_data:/var/lib/rabbitmq
       - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
       - rabbitmq_generated_config:/etc/rabbitmq/generated:ro
+    networks:
+      - iot-backend
+
+  rabbitmq-lb:
+    image: haproxy:3.0-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:11883:1883"
+      - "127.0.0.1:18404:8404"
+    volumes:
+      - ./infra/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      rabbitmq-1:
+        condition: service_healthy
+      rabbitmq-2:
+        condition: service_healthy
+      rabbitmq-3:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "haproxy", "-c", "-f", "/usr/local/etc/haproxy/haproxy.cfg"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - iot-backend
 
@@ -129,11 +145,7 @@ services:
     entrypoint: ["/bin/sh", "/opt/node-red-source/scripts/bootstrap-node-red.sh"]
     command: []
     depends_on:
-      rabbitmq-1:
-        condition: service_healthy
-      rabbitmq-2:
-        condition: service_healthy
-      rabbitmq-3:
+      rabbitmq-lb:
         condition: service_healthy
     networks:
       - iot-backend
@@ -144,7 +156,7 @@ services:
     restart: unless-stopped
     environment:
       DOTNET_ENVIRONMENT: Production
-      RabbitMq__HostName: rabbitmq
+      RabbitMq__HostName: rabbitmq-lb
       RabbitMq__Port: 5672
       RabbitMq__VirtualHost: ${RABBITMQ_VHOST:?RABBITMQ_VHOST is required}
       RabbitMq__UserName: ${RABBITMQ_CONSUMER_USER:?RABBITMQ_CONSUMER_USER is required}
@@ -157,11 +169,7 @@ services:
       Mongo__DatabaseName: ${MONGO_APP_DATABASE:?MONGO_APP_DATABASE is required}
       Mongo__CollectionName: telemetry_events
     depends_on:
-      rabbitmq-1:
-        condition: service_healthy
-      rabbitmq-2:
-        condition: service_healthy
-      rabbitmq-3:
+      rabbitmq-lb:
         condition: service_healthy
       mongodb:
         condition: service_healthy
