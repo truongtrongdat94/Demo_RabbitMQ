@@ -1,0 +1,101 @@
+services:
+  rabbitmq-definitions:
+    volumes:
+      - ./infra/rabbitmq/rabbitmq.tls.conf.template:/work/rabbitmq.conf.template:ro
+
+  rabbitmq-1:
+    volumes:
+      - type: bind
+        source: ./infra/tls/generated/ca.crt
+        target: /etc/rabbitmq/tls/ca.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./infra/tls/generated/server.crt
+        target: /etc/rabbitmq/tls/server.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./infra/tls/generated/server.key
+        target: /etc/rabbitmq/tls/server.key
+        read_only: true
+        bind:
+          create_host_path: false
+
+  rabbitmq-2:
+    volumes:
+      - type: bind
+        source: ./infra/tls/generated/ca.crt
+        target: /etc/rabbitmq/tls/ca.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./infra/tls/generated/server.crt
+        target: /etc/rabbitmq/tls/server.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./infra/tls/generated/server.key
+        target: /etc/rabbitmq/tls/server.key
+        read_only: true
+        bind:
+          create_host_path: false
+
+  rabbitmq-3:
+    volumes:
+      - type: bind
+        source: ./infra/tls/generated/ca.crt
+        target: /etc/rabbitmq/tls/ca.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./infra/tls/generated/server.crt
+        target: /etc/rabbitmq/tls/server.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./infra/tls/generated/server.key
+        target: /etc/rabbitmq/tls/server.key
+        read_only: true
+        bind:
+          create_host_path: false
+
+  rabbitmq-lb:
+    ports:
+      - "127.0.0.1:5671:5671"
+      - "127.0.0.1:18884:8883"
+    volumes:
+      - ./infra/haproxy/haproxy.tls.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+
+  node-red:
+    environment:
+      NODE_EXTRA_CA_CERTS: /certs/ca.crt
+      NODE_RED_MQTT_PORT: ${NODE_RED_MQTT_TLS_PORT:?NODE_RED_MQTT_TLS_PORT is required}
+      NODE_RED_MQTT_USE_TLS: "true"
+    volumes:
+      - type: bind
+        source: ./infra/tls/generated/ca.crt
+        target: /certs/ca.crt
+        read_only: true
+        bind:
+          create_host_path: false
+
+  consumer-service:
+    environment:
+      RabbitMq__Port: ${CONSUMER_RABBITMQ_TLS_PORT:?CONSUMER_RABBITMQ_TLS_PORT is required}
+      RabbitMq__UseTls: "true"
+      RabbitMq__TlsServerName: rabbitmq-lb
+      RabbitMq__TlsCaCertificatePath: /certs/ca.crt
+    volumes:
+      - type: bind
+        source: ./infra/tls/generated/ca.crt
+        target: /certs/ca.crt
+        read_only: true
+        bind:
+          create_host_path: false

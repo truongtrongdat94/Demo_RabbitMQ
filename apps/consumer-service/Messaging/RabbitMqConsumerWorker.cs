@@ -3,6 +3,9 @@ using ConsumerService.Processing;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using System.Net.Security;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 
 namespace ConsumerService.Messaging;
 
@@ -33,7 +36,8 @@ public sealed class RabbitMqConsumerWorker : BackgroundService
             Password = _options.Password,
             AutomaticRecoveryEnabled = true,
             TopologyRecoveryEnabled = true,
-            ConsumerDispatchConcurrency = 1
+            ConsumerDispatchConcurrency = _options.ConsumerDispatchConcurrency,
+            Ssl = BuildSslOption(_options)
         };
 
         await using var connection = await factory.CreateConnectionAsync(stoppingToken);
@@ -79,6 +83,59 @@ public sealed class RabbitMqConsumerWorker : BackgroundService
                 await consumer.DisposeAsync();
             }
         }
+    }
+
+    private static SslOption BuildSslOption(RabbitMqOptions options)
+    {
+        if (!options.UseTls)
+        {
+            return new SslOption { Enabled = false };
+        }
+
+        var serverName = options.TlsServerName ?? options.HostName;
+        var sslOption = new SslOption
+        {
+            Enabled = true,
+            ServerName = serverName,
+            Version = SslProtocols.Tls12 | SslProtocols.Tls13
+        };
+
+        if (!string.IsNullOrWhiteSpace(options.TlsCaCertificatePath))
+        {
+            var caCertificate = X509Certificate2.CreateFromPem(
+                File.ReadAllText(options.TlsCaCertificatePath));
+
+            sslOption.CertificateValidationCallback = (_, certificate, _, sslPolicyErrors) =>
+                ValidateServerCertificateWithCustomCa(caCertificate, certificate, sslPolicyErrors);
+        }
+
+        return sslOption;
+    }
+
+    private static bool ValidateServerCertificateWithCustomCa(
+        X509Certificate2 caCertificate,
+        X509Certificate? certificate,
+        SslPolicyErrors sslPolicyErrors)
+    {
+        if (certificate is null)
+        {
+            return false;
+        }
+
+        if ((sslPolicyErrors & SslPolicyErrors.RemoteCertificateNameMismatch) != 0
+            || (sslPolicyErrors & SslPolicyErrors.RemoteCertificateNotAvailable) != 0)
+        {
+            return false;
+        }
+
+        using var serverCertificate = certificate as X509Certificate2 ?? new X509Certificate2(certificate);
+        using var chain = new X509Chain();
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(caCertificate);
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+
+        return chain.Build(serverCertificate);
     }
 
     private sealed class QueueConsumer : IAsyncDisposable

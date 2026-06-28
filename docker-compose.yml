@@ -137,6 +137,8 @@ services:
       NODE_RED_CREDENTIAL_SECRET: ${NODE_RED_CREDENTIAL_SECRET:?NODE_RED_CREDENTIAL_SECRET is required}
       NODE_RED_MQTT_USERNAME: ${RABBITMQ_PUBLISHER_USER:?RABBITMQ_PUBLISHER_USER is required}
       NODE_RED_MQTT_PASSWORD: ${RABBITMQ_PUBLISHER_PASSWORD:?RABBITMQ_PUBLISHER_PASSWORD is required}
+      NODE_RED_MQTT_BROKER: rabbitmq-lb
+      NODE_RED_MQTT_PORT: ${NODE_RED_MQTT_PORT:?NODE_RED_MQTT_PORT is required}
     volumes:
       - node_red_data:/data
       - ./simulators/node-red-publisher/flows.json:/opt/node-red-source/flows.json:ro
@@ -157,14 +159,15 @@ services:
     environment:
       DOTNET_ENVIRONMENT: Production
       RabbitMq__HostName: rabbitmq-lb
-      RabbitMq__Port: 5672
+      RabbitMq__Port: ${CONSUMER_RABBITMQ_PORT:?CONSUMER_RABBITMQ_PORT is required}
       RabbitMq__VirtualHost: ${RABBITMQ_VHOST:?RABBITMQ_VHOST is required}
       RabbitMq__UserName: ${RABBITMQ_CONSUMER_USER:?RABBITMQ_CONSUMER_USER is required}
       RabbitMq__Password: ${RABBITMQ_CONSUMER_PASSWORD:?RABBITMQ_CONSUMER_PASSWORD is required}
       RabbitMq__Queues__0: telemetry.electricity.queue
       RabbitMq__Queues__1: telemetry.steam.queue
       RabbitMq__Queues__2: telemetry.gas.queue
-      RabbitMq__PrefetchCount: ${CONSUMER_RABBITMQ_PREFETCH:-8}
+      RabbitMq__PrefetchCount: ${CONSUMER_RABBITMQ_PREFETCH:?CONSUMER_RABBITMQ_PREFETCH is required}
+      RabbitMq__ConsumerDispatchConcurrency: ${CONSUMER_RABBITMQ_DISPATCH_CONCURRENCY:?CONSUMER_RABBITMQ_DISPATCH_CONCURRENCY is required}
       Mongo__ConnectionString: ${CONSUMER_MONGO_CONNECTION_STRING:?CONSUMER_MONGO_CONNECTION_STRING is required}
       Mongo__DatabaseName: ${MONGO_APP_DATABASE:?MONGO_APP_DATABASE is required}
       Mongo__CollectionName: telemetry_events
